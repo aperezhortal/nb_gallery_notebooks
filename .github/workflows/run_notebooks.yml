@@ -73,6 +73,8 @@ jobs:
           jupyter nbconvert --to notebook --inplace --execute ./*/*.ipynb
 
       - name: Commit notebooks
+        env:
+          RENDER_BRANCH: ${{needs.get_target_branch.outputs.target_branch}}
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
