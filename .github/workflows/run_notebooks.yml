@@ -12,34 +12,9 @@ on:
     branches: [ main, dev ]
 
 jobs:
-  get_target_branch:
-    # https://pwgen88.medium.com/getting-branch-name-in-github-actions-based-on-workflow-trigger-1d10b8515d37
-    name: Get target branch for the rendered notebooks
-    runs-on: "ubuntu-latest"
-    outputs:
-      target_branch: ${{ steps.target_branch.outputs.branch }}
-    steps:
-      - name: Get target branch
-        id: target_branch
-        run: |
-          if [[ "${GITHUB_EVENT_NAME}" == "push" ]]; then
-            branch=$(echo ${GITHUB_REF##*/})
-          elif [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
-            branch=$(echo $GITHUB_BASE_REF)
-          else
-            branch=unknown
-          fi
-
-          if [[ $branch == "dev" ]]; then
-            echo "::set-output name=branch::test"
-          else
-            echo "::set-output name=branch::latest"
-          fi
-
   run_notebooks:
     name: Execute jupyter notebooks
     runs-on: "ubuntu-latest"
-    needs: get_target_branch
 
     defaults:
       run:
@@ -62,9 +37,44 @@ jobs:
           repository: ${{ env.LINKED_REPO }}
           path: ${{ env.LINKED_REPO }}
 
-      - name: Install dependency from linked repository
+      - name: Install package from the linked repository
+        working-directory: ${{ env.LINKED_REPO }}
         run: |
-          echo "Here we should install the package"
+          pip install .
+          echo "LINKED_PAKAGE_TAG=`git name-rev --name-only --tags HEAD`" >> $GITHUB_ENV
+
+      - name: Determine destination branch for rendered notebooks
+        id: nb_dest_branch
+        working-directory: ${{ env.LINKED_REPO }}
+        run: |
+          ########################################
+          # Find the branch that trigger the event
+          if [[ "${GITHUB_EVENT_NAME}" == "push" ]]; then
+            event_branch=$(echo ${GITHUB_REF##*/})
+          elif [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
+            event_branch=$(echo $GITHUB_BASE_REF)
+          else
+            event_branch=unknown
+          fi
+
+          ####################################################################
+          # Check if the Linked repository current commit corresponds to a tag
+          echo "::set-output name=dest_branch::test"
+          LINKED_REPO_TAG=$(git name-rev --name-only --tags HEAD)
+
+          ###################################
+          # Determina destination branch name
+          if [[ "${LINKED_REPO_TAG}" == "undefined" ]]; then
+            # Not a tagged version
+            if [[ "${event_branch}" == "dev" ]]; then
+              echo "::set-output name=dest_branch::test"
+            else
+              echo "::set-output name=dest_branch::latest"
+            fi
+          else
+            # Save tagged versions in their own branch
+            echo "::set-output name=dest_branch::${LINKED_REPO_TAG}"
+          fi
 
       - name: Execute notebooks
         working-directory: ./notebooks
@@ -85,4 +95,4 @@ jobs:
         uses: ad-m/github-push-action@master
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          branch: ${{needs.get_target_branch.outputs.target_branch }}
+          branch: ${{ steps.nb_dest_branch.outputs.dest_branch }}
