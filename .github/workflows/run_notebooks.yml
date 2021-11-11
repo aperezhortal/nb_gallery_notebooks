@@ -67,9 +67,10 @@ jobs:
           echo "Here we should install the package"
 
       - name: Execute notebooks
-        working-directory: ./docs/notebooks
+        working-directory: ./notebooks
         run: |
           jupyter nbconvert --to notebook --inplace --execute ./*.ipynb
+          jupyter nbconvert --to notebook --inplace --execute ./*/*.ipynb
 
       - name: Commit notebooks
         run: |
