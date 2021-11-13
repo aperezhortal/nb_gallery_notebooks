@@ -31,7 +31,7 @@ jobs:
           environment-name: doc_builder
           extra-specs: python=3.8
 
-      - name: Clone linked repo
+      - name: Checkout linked repository
         uses: actions/checkout@v2
         with:
           repository: ${{ env.LINKED_REPO }}
@@ -41,9 +41,10 @@ jobs:
         working-directory: ${{ env.LINKED_REPO }}
         run: |
           pip install .
+          git log HEAD
           echo "LINKED_PAKAGE_TAG=`git name-rev --name-only --tags HEAD`" >> $GITHUB_ENV
 
-      - name: Determine destination branch for rendered notebooks
+      - name: Determine destination branch for the rendered notebooks
         id: nb_dest_branch
         working-directory: ${{ env.LINKED_REPO }}
         run: |
@@ -56,10 +57,10 @@ jobs:
           else
             event_branch=unknown
           fi
+          echo "::set-output name=event_branch::${event_branch}"
 
           ####################################################################
           # Check if the Linked repository current commit corresponds to a tag
-          echo "::set-output name=dest_branch::test"
           LINKED_REPO_TAG=$(git name-rev --name-only --tags HEAD)
 
           ###################################
@@ -82,9 +83,19 @@ jobs:
           jupyter nbconvert --to notebook --inplace --execute ./*.ipynb
           jupyter nbconvert --to notebook --inplace --execute ./*/*.ipynb
 
+      - name: Print debug informormation
+        env:
+          RENDER_BRANCH: ${{needs.get_target_branch.outputs.dest_branch}}
+          EVENT_BRANCH: ${{needs.get_target_branch.outputs.event_branch}}
+        run: |
+          echo "EVENT_BRANCH=${EVENT_BRANCH}"
+          echo "LINKED_REPO_TAG=${LINKED_REPO_TAG}"
+          echo "GITHUB_SHA=${$GITHUB_SHA}"
+          echo "RENDER_BRANCH=${RENDER_BRANCH}"
+
       - name: Commit notebooks
         env:
-          RENDER_BRANCH: ${{needs.get_target_branch.outputs.target_branch}}
+          RENDER_BRANCH: ${{needs.get_target_branch.outputs.dest_branch}}
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
