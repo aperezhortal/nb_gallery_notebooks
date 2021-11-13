@@ -115,8 +115,8 @@ jobs:
           git clean -d -f -f
 
           # Switch to destination branch
-          res=$(git ls-remote --exit-code --heads origin ${RENDER_BRANCH})
-          if [ "$?" = "0" ] ; then
+          action=$(git ls-remote --exit-code --heads origin ${RENDER_BRANCH} || echo "merge")
+          if [ "$action" = "merge" ] ; then
             # If it exits, merge the changes and push.
             git merge --strategy=ours --allow-unrelated-histories origin/${RENDER_BRANCH} -m "Commit"
 
