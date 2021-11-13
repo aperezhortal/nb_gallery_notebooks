@@ -41,8 +41,10 @@ jobs:
         working-directory: ${{ env.LINKED_REPO }}
         run: |
           pip install .
+          # actions/checkout@v2 only checkouts a sinlge commit without tags.
+          git fetch --all --tags
+
           git log HEAD
-          git git name-rev --name-only --tags HEAD
 
       - name: Determine destination branch for the rendered notebooks
         id: nb_dest_branch
