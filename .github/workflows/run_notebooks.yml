@@ -64,6 +64,7 @@ jobs:
           ####################################################################
           # Check if the Linked repository current commit corresponds to a tag
           LINKED_REPO_TAG=$(git name-rev --name-only --tags HEAD)
+          echo "::set-output name=linked_repo_tag::${LINKED_REPO_TAG}"
 
           ###################################
           # Determina destination branch name
@@ -89,6 +90,7 @@ jobs:
         env:
           RENDER_BRANCH: ${{steps.nb_dest_branch.outputs.dest_branch}}
           EVENT_BRANCH: ${{steps.nb_dest_branch.outputs.event_branch}}
+          LINKED_REPO_TAG: ${{steps.nb_dest_branch.outputs.linked_repo_tag}}
         run: |
           echo "EVENT_BRANCH=${EVENT_BRANCH}"
           echo "LINKED_REPO_TAG=${LINKED_REPO_TAG}"
@@ -112,13 +114,18 @@ jobs:
           # Clean rest of the files.
           git clean -d -f -f
 
-          # Merge the orphan branch with the RENDER_BRANCH
-          git merge --strategy=ours --allow-unrelated-histories origin/${RENDER_BRANCH} -m "Commit"
+          # Switch to destination branch
+          git ls-remote --exit-code --heads origin ${RENDER_BRANCH}
+          if [ "$?" = "0" ] ; then
+            # If it exits, merge the changes and push.
+            git merge --strategy=ours --allow-unrelated-histories origin/${RENDER_BRANCH} -m "Commit"
 
-          # Add changes to the RENDER_BRANCH.
-          git checkout -b ${RENDER_BRANCH} origin/${RENDER_BRANCH}
-          git merge --squash tmp
-          git commit --allow-empty -m "Rendering $GITHUB_SHA"
+            # Add changes to the RENDER_BRANCH.
+            git checkout -b ${RENDER_BRANCH} origin/${RENDER_BRANCH}
+            git merge --squash tmp
+            git commit --allow-empty -m "Rendering $GITHUB_SHA"
+          fi
+          #Otherwise, the next task will push the orpahn branch.
 
       - name: Push changes
         uses: ad-m/github-push-action@master
