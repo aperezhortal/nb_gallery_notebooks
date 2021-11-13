@@ -42,7 +42,7 @@ jobs:
         run: |
           pip install .
           git log HEAD
-          echo "LINKED_PAKAGE_TAG=`git name-rev --name-only --tags HEAD`" >> $GITHUB_ENV
+          git git name-rev --name-only --tags HEAD
 
       - name: Determine destination branch for the rendered notebooks
         id: nb_dest_branch
@@ -99,11 +99,27 @@ jobs:
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
-          git checkout --orphan ${RENDER_BRANCH}
-          git commit -a -m "Rendering $GITHUB_SHA"
+
+          # Checkout changes in an orphan branch first.
+          # We want to update  only the notebooks.
+          git checkout --orphan tmp
+          git reset
+          git add -A notebooks
+          git commit -m "Rendering $GITHUB_SHA"
+
+          # Clean rest of the files.
+          git clean -d -f -f
+
+          # Merge the orphan branch with the RENDER_BRANCH
+          git merge --strategy=ours --allow-unrelated-histories origin/${RENDER_BRANCH} -m "Commit"
+
+          # Add changes to the RENDER_BRANCH.
+          git checkout -b ${RENDER_BRANCH} origin/${RENDER_BRANCH}
+          git merge --squash tmp
+          git commit --allow-empty -m "Rendering $GITHUB_SHA"
 
       - name: Push changes
         uses: ad-m/github-push-action@master
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          branch: ${{ steps.nb_dest_branch.outputs.dest_branch }}
+          branch: ${{steps.nb_dest_branch.outputs.dest_branch}}
