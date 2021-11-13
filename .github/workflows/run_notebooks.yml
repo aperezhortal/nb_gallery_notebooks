@@ -83,19 +83,19 @@ jobs:
           jupyter nbconvert --to notebook --inplace --execute ./*.ipynb
           jupyter nbconvert --to notebook --inplace --execute ./*/*.ipynb
 
-      - name: Print debug informormation
+      - name: Print debug information
         env:
-          RENDER_BRANCH: ${{needs.get_target_branch.outputs.dest_branch}}
-          EVENT_BRANCH: ${{needs.get_target_branch.outputs.event_branch}}
+          RENDER_BRANCH: ${{steps.nb_dest_branch.outputs.dest_branch}}
+          EVENT_BRANCH: ${{steps.nb_dest_branch.outputs.event_branch}}
         run: |
           echo "EVENT_BRANCH=${EVENT_BRANCH}"
           echo "LINKED_REPO_TAG=${LINKED_REPO_TAG}"
-          echo "GITHUB_SHA=${$GITHUB_SHA}"
+          echo "GITHUB_SHA=${GITHUB_SHA}"
           echo "RENDER_BRANCH=${RENDER_BRANCH}"
 
       - name: Commit notebooks
         env:
-          RENDER_BRANCH: ${{needs.get_target_branch.outputs.dest_branch}}
+          RENDER_BRANCH: ${{steps.nb_dest_branch.outputs.dest_branch}}
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
