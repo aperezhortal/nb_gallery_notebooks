@@ -117,6 +117,7 @@ jobs:
           # Switch to destination branch
           action=$(git ls-remote --exit-code --heads origin ${RENDER_BRANCH} > /dev/null || echo "push")
           if [ "$action" != "push" ] ; then
+            git fetch origin ${RENDER_BRANCH}
             # If it exits, merge the changes and push.
             git merge --strategy=ours --allow-unrelated-histories origin/${RENDER_BRANCH} -m "Commit"
 
