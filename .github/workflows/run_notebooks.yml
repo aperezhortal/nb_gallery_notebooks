@@ -156,7 +156,7 @@ jobs:
         run: |
           # Ignore triggering if this workflow was triggered by the dev branch.
           if [[ "${RTD_BRANCH}" != "test" ]]; then
-            curl -X POST -d "branches=latest -d "token=$RTD_TOKEN" "$RTD_URL"
+            curl -X POST -d "branches=latest" -d "token=$RTD_TOKEN" "$RTD_URL"
           else
             curl -X POST -d "branches=${RTD_BRANCH}" -d "token=$RTD_TOKEN" "$RTD_URL"
           fi
