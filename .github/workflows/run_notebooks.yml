@@ -1,3 +1,7 @@
+# Execute the jupyter notebooks, push them to dedicate branches,
+# and trigger ReadTheDocs for the axuliary repository.
+# This workflow was largely inspired by the following wradlib-notebooks CI task:
+# https://github.com/wradlib/wradlib-notebooks/blob/main/.github/workflows/main.yml
 name: Execute jupyter notebooks
 
 env:
@@ -20,6 +24,9 @@ jobs:
       run:
         shell: bash -l {0}
 
+    outputs:
+      rtd_branch: ${{steps.get_nb_render_branch.outputs.render_branch}}
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
@@ -41,13 +48,12 @@ jobs:
         working-directory: ${{ env.LINKED_REPO }}
         run: |
           pip install .
-          # actions/checkout@v2 only checkouts a sinlge commit without tags.
+          # Since actions/checkout@v2 only checkouts a single commit without tags let's fetch the tags
           git fetch --all --tags
-
           git log HEAD
 
-      - name: Determine destination branch for the rendered notebooks
-        id: nb_dest_branch
+      - name: Determine destination branch for the rendered notebooks and the RTD branch
+        id: get_nb_render_branch
         working-directory: ${{ env.LINKED_REPO }}
         run: |
           ########################################
@@ -67,17 +73,17 @@ jobs:
           echo "::set-output name=linked_repo_tag::${LINKED_REPO_TAG}"
 
           ###################################
-          # Determina destination branch name
+          # Determine destination branch name
           if [[ "${LINKED_REPO_TAG}" == "undefined" ]]; then
             # Not a tagged version
             if [[ "${event_branch}" == "dev" ]]; then
-              echo "::set-output name=dest_branch::test"
+              echo "::set-output name=render_branch::test"
             else
-              echo "::set-output name=dest_branch::latest"
+              echo "::set-output name=render_branch::latest"
             fi
           else
             # Save tagged versions in their own branch
-            echo "::set-output name=dest_branch::${LINKED_REPO_TAG}"
+            echo "::set-output name=render_branch::${LINKED_REPO_TAG}"
           fi
 
       - name: Execute notebooks
@@ -88,9 +94,9 @@ jobs:
 
       - name: Print debug information
         env:
-          RENDER_BRANCH: ${{steps.nb_dest_branch.outputs.dest_branch}}
-          EVENT_BRANCH: ${{steps.nb_dest_branch.outputs.event_branch}}
-          LINKED_REPO_TAG: ${{steps.nb_dest_branch.outputs.linked_repo_tag}}
+          RENDER_BRANCH: ${{steps.get_nb_render_branch.outputs.render_branch}}
+          EVENT_BRANCH: ${{steps.get_nb_render_branch.outputs.event_branch}}
+          LINKED_REPO_TAG: ${{steps.get_nb_render_branch.outputs.linked_repo_tag}}
         run: |
           echo "EVENT_BRANCH=${EVENT_BRANCH}"
           echo "LINKED_REPO_TAG=${LINKED_REPO_TAG}"
@@ -99,7 +105,7 @@ jobs:
 
       - name: Commit notebooks
         env:
-          RENDER_BRANCH: ${{steps.nb_dest_branch.outputs.dest_branch}}
+          RENDER_BRANCH: ${{steps.get_nb_render_branch.outputs.render_branch}}
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
@@ -132,4 +138,25 @@ jobs:
         uses: ad-m/github-push-action@master
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          branch: ${{steps.nb_dest_branch.outputs.dest_branch}}
+          branch: ${{steps.get_nb_render_branch.outputs.render_branch}}
+
+  trigger_rtd:
+      needs: [run_notebooks]
+      name: Trigger readthedocs
+      runs-on: ubuntu-latest
+      defaults:
+        run:
+          shell: bash -l {0}
+      env:
+        RTD_TOKEN: ${{ secrets.RTD_TOKEN }}
+        RTD_URL: ${{ secrets.RTD_URL }}
+        RTD_BRANCH: ${{needs.run_notebooks.outputs.rtd_branch}}
+      steps:
+      - name: Trigger readthedocs for the corresponding branch (latest or tag)
+        run: |
+          # Ignore triggering if this workflow was triggered by the dev branch.
+          if [[ "${RTD_BRANCH}" != "test" ]]; then
+            curl -X POST -d "branches=latest -d "token=$RTD_TOKEN" "$RTD_URL"
+          else
+            curl -X POST -d "branches=${RTD_BRANCH}" -d "token=$RTD_TOKEN" "$RTD_URL"
+          fi
