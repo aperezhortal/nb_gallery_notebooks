@@ -141,6 +141,9 @@ jobs:
           branch: ${{steps.get_nb_render_branch.outputs.render_branch}}
 
   trigger_rtd:
+      # Task adapted from the wradlib project
+      # https://github.com/wradlib/wradlib-notebooks/blob/main/.github/workflows/render_notebooks.yml
+
       needs: [run_notebooks]
       name: Trigger readthedocs
       runs-on: ubuntu-latest
